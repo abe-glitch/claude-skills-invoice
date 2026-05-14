@@ -7,8 +7,8 @@ Claude.ai で使えるカスタムスキル集です。
 
 | スキル名 | 概要 |
 |---|---|
-| [invoice-lag](./invoice-lag/) | 発注書PDF → 請求書Excel 自動生成 |
-| [invoice-teams](./invoice-teams/) | 注文書Excel → 請求書Excel 自動生成 |
+| [invoice-lag](./invoice-lag/) | 発注書PDF → 請求書Excel 自動生成（LAG用の請求書全般） |
+| [invoice-teams](./invoice-teams/) | 注文書Excel → 請求書Excel 自動生成（TEAMSの請求書全般） |
 
 ---
 
