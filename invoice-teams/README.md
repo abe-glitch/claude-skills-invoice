@@ -1,6 +1,6 @@
 # invoice-teams — 注文書Excel → 請求書Excel 自動生成スキル
 
-注文書（Excel）と請求書テンプレート（Excel）をアップロードすることで、請求書を自動生成します。
+注文書（**Excel または PDF**）と請求書テンプレート（Excel）をアップロードすることで、請求書を自動生成します。
 
 ## できること
 
@@ -26,7 +26,7 @@
 1. Claude のチャット画面を開く
 2. 入力欄左側の 📎 **クリップアイコン**をクリック
 3. 以下の **2ファイル**を選択してアップロード
-   - **注文書 Excel**（`.xlsx`）
+   - **注文書**（`.xlsx` または `.pdf`）
    - **請求書テンプレート Excel**（`.xlsx`）
 
 > 2ファイルは同時に選択してまとめてアップロードできます。
@@ -56,7 +56,7 @@
 ## 必要なライブラリ
 
 ```bash
-pip install openpyxl --break-system-packages
+pip install openpyxl pdfplumber --break-system-packages
 ```
 
 ## 対応フォーマット

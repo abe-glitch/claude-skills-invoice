@@ -1,8 +1,8 @@
 ---
 name: invoice-teams
 description: >
-  注文書Excel（.xlsx）から請求書Excel（.xlsx）を自動生成するスキル。
-  ユーザーが注文書（Excel）と請求書テンプレート（Excel）をアップロードして
+  注文書（Excel/.xlsx または PDF）から請求書Excel（.xlsx）を自動生成するスキル。
+  ユーザーが注文書（ExcelまたはPDF）と請求書テンプレート（Excel）をアップロードして
   「請求書を作成して」「注文書から請求書に転記して」「自動入力して」などと言ったときに必ず使用すること。
   注文書の宛名会社・担当者・件名・明細（内容・数量・単価）を読み取り、
   請求書テンプレートの正しいセルに自動入力して完成した請求書ファイルを出力する。
@@ -48,12 +48,16 @@ description: >
 ### Step 1: ファイルの確認
 
 ユーザーが以下をアップロードしているか確認する：
-1. **注文書 Excel**（`.xlsx`）— 読み取り対象
+1. **注文書**（`.xlsx` または `.pdf`）— 読み取り対象
 2. **請求書テンプレート Excel**（`.xlsx`）— 入力対象
 
 どちらかが足りない場合はアップロードを依頼する。
 
-### Step 2: 注文書Excelの読み取り
+### Step 2: 注文書の読み取り
+
+アップロードされたファイルの拡張子を確認し、Excel か PDF かで処理を分岐する。
+
+#### Excel（.xlsx）の場合
 
 `scripts/extract_po_excel.py` を実行して注文書から情報を抽出する：
 
@@ -116,6 +120,70 @@ def extract_from_excel(po_path):
 
     return data
 ```
+
+#### PDF（.pdf）の場合
+
+`pdfplumber` を使ってテキストを抽出し、キーワードで各項目を探す：
+
+```python
+import pdfplumber
+import re
+
+def extract_from_pdf(po_path):
+    data = {
+        '宛名会社': '',
+        '担当者': '',
+        '件名': '',
+        '明細': [],
+    }
+
+    with pdfplumber.open(po_path) as pdf:
+        full_text = '\n'.join(
+            page.extract_text() or '' for page in pdf.pages
+        )
+
+    lines = full_text.splitlines()
+
+    for i, line in enumerate(lines):
+        # 発注元会社名：「セールス番号」を含む行の近くにある会社名
+        if 'セールス番号' in line or '経費番号' in line:
+            # 同行または次行に会社名が含まれることが多い
+            candidates = re.findall(r'[^\s　]+株式会社[^\s　]*|[^\s　]+有限会社[^\s　]*', line)
+            if not candidates and i + 1 < len(lines):
+                candidates = re.findall(r'[^\s　]+株式会社[^\s　]*|[^\s　]+有限会社[^\s　]*', lines[i + 1])
+            if candidates:
+                data['宛名会社'] = candidates[0].strip()
+
+        # 担当者名：「担当者」を含む行
+        if '担当者' in line:
+            # 「担当者」の右側または次トークンに名前がある
+            match = re.search(r'担当者[：:　\s]*([^\s　]+)', line)
+            if match:
+                data['担当者'] = match.group(1).strip()
+
+        # 注文件名
+        if '注文件名' in line:
+            match = re.search(r'注文件名[：:　\s]*(.+)', line)
+            if match:
+                data['件名'] = match.group(1).strip()
+            elif i + 1 < len(lines):
+                data['件名'] = lines[i + 1].strip()
+
+        # 明細：行頭が数字で始まる行を明細候補とする
+        match = re.match(r'^(\d+)\s+(.+?)\s+(\d+)式?\s+([\d,]+)$', line)
+        if match:
+            qty_str = match.group(3)
+            price_str = match.group(4).replace(',', '')
+            data['明細'].append({
+                '内容': '■' + match.group(2).strip(),
+                '数量': int(qty_str),
+                '単価': int(price_str) if price_str.isdigit() else 0,
+            })
+
+    return data
+```
+
+> PDF のレイアウトによって抽出精度が変わる場合がある。抽出結果をユーザーに確認してから請求書に転記すること。
 
 ### Step 3: 請求書テンプレートへの書き込み
 
@@ -181,6 +249,7 @@ BytesIOで得たバイナリは **Write tool** を使って `/sessions/.../mnt/o
 ## 注意事項
 
 - `openpyxl` が必要。未インストールの場合は `pip install openpyxl --break-system-packages` を実行する
+- PDF 読み取りには `pdfplumber` が必要。未インストールの場合は `pip install pdfplumber --break-system-packages` を実行する
 - 明細行は最大29件（行17〜45）まで対応
 - テンプレートにはマージセルが多数ある。マージセルの親セル以外に値を書くと `AttributeError: 'MergedCell'` になるため、必ず親セルに書き込むこと
 - 金額・消費税・合計はテンプレートの数式（`=IF(D17*F17=0,"",D17*F17)` 等）が自動計算するため入力しない
